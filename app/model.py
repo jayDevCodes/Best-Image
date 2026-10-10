@@ -26,6 +26,24 @@ class SiglipScorer:
     def status(self) -> dict[str, Any]:
         return {"loaded": self.is_loaded, "model": MODEL_ID, "device": self._device, "load_error": self._load_error}
 
+    def unload(self) -> None:
+        """Release SigLIP weights before an optional larger local scorer is loaded."""
+        import gc
+        with self._lock:
+            torch = self._torch
+            loaded_model = self._model
+            self._model = None
+            self._processor = None
+            self._torch = None
+            self._device = None
+            if torch is not None and hasattr(torch, "mps") and hasattr(torch.mps, "empty_cache"):
+                try:
+                    torch.mps.empty_cache()
+                except Exception:
+                    pass
+            del loaded_model
+        gc.collect()
+
     def _load(self) -> None:
         if self.is_loaded:
             return
