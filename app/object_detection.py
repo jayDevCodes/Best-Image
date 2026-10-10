@@ -37,7 +37,7 @@ _ALIASES = {
     "skateboard": "skateboard", "skateboards": "skateboard", "surfboard": "surfboard", "bottle": "bottle",
     "bottles": "bottle", "glass": "wine glass", "wine glass": "wine glass", "cup": "cup", "cups": "cup",
     "fork": "fork", "knife": "knife", "spoon": "spoon", "bowl": "bowl", "banana": "banana", "bananas": "banana",
-    "apple": "apple", "apples": "apple", "orange": "orange", "oranges": "orange",
+    "apple": "apple", "apples": "apple",
     "sandwich": "sandwich", "broccoli": "broccoli", "carrot": "carrot",
     "hot dog": "hot dog", "pizza": "pizza", "donut": "donut", "doughnut": "donut", "cake": "cake",
     "chair": "chair", "chairs": "chair", "couch": "couch", "sofa": "couch", "plant": "potted plant",
