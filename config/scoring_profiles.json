@@ -1,0 +1,24 @@
+{
+  "profiles": {
+    "prompt_accuracy": {
+      "label": "Prompt Accuracy",
+      "description": "Prioritize overall prompt match and inferred prompt details.",
+      "weights": {
+        "prompt_match": 0.55,
+        "requirement_match": 0.30,
+        "image_clarity": 0.10,
+        "technical_quality": 0.05
+      }
+    },
+    "visual_balance": {
+      "label": "Visual Balance",
+      "description": "Balance prompt relevance with clarity and resolution diagnostics.",
+      "weights": {
+        "prompt_match": 0.45,
+        "requirement_match": 0.20,
+        "image_clarity": 0.20,
+        "technical_quality": 0.15
+      }
+    }
+  }
+}

@@ -8,7 +8,7 @@ Best-Image compares multiple generated images against a prompt and returns a ran
 
 ## Quick start (macOS / Apple Silicon)
 
-\`\`\`bash
+```bash
 git clone https://github.com/jayDevCodes/Best-Image.git
 cd Best-Image
 python3.11 -m venv .venv
@@ -18,15 +18,15 @@ pip install -r requirements.txt
 pip install -r requirements-dev.txt
 pytest -q
 python -m app
-\`\`\`
+```
 
 Open http://127.0.0.1:8765. The first analysis downloads the model (roughly 1.5 GB of weights plus tokenizer/configuration files); later runs reuse the Hugging Face cache. Model inference is local after the cache is populated.
 
 If MPS inference has issues, use CPU mode:
 
-\`\`\`bash
+```bash
 BEST_IMAGE_DEVICE=cpu python -m app
-\`\`\`
+```
 
 ## v0.1 features
 

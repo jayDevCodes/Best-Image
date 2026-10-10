@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <meta name="description" content="Compare generated images against a prompt with local AI.">
+  <title>Best-Image — Local AI Evaluator</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <div class="glow glow-a"></div><div class="glow glow-b"></div>
+  <main class="shell">
+    <header class="topbar">
+      <a class="brand" href="/"><span class="mark">B<span>·</span></span><span>best<span class="brand-light">/image</span></span></a>
+      <span class="local-pill"><i></i> LOCAL INFERENCE</span>
+    </header>
+    <section class="hero">
+      <p class="eyebrow">PROMPT-TO-IMAGE EVALUATION · V0.1</p>
+      <h1>Find the image that<br><em>gets it right.</em></h1>
+      <p class="hero-copy">Compare generated images against your prompt. See an explainable ranking and the reasons behind it — locally on your Mac.</p>
+    </section>
+
+    <section class="panel">
+      <div class="section-heading"><div><span class="step">01</span><h2>Describe the target</h2></div><span class="helper">Subject · style · details</span></div>
+      <label class="label" for="prompt">Generation prompt</label>
+      <textarea id="prompt" maxlength="2000" rows="4" placeholder="A golden retriever wearing a red scarf, sitting on green grass at sunset, realistic photography…" required></textarea>
+      <div class="field-foot"><span>Evaluate against the prompt you provide</span><span id="char-count">0 / 2000</span></div>
+      <div class="section-heading upload-heading"><div><span class="step">02</span><h2>Add candidate images</h2></div><span class="helper" id="image-count">2–6 images</span></div>
+      <div id="drop-zone" class="drop-zone" tabindex="0" role="button" aria-label="Choose or drop image files">
+        <input id="image-input" type="file" accept="image/png,image/jpeg,image/webp" multiple hidden>
+        <div class="upload-icon" aria-hidden="true">↑</div><strong>Drop your images here</strong><span>or click to browse · PNG, JPEG, WebP · 15 MB each max</span>
+      </div>
+      <div id="preview-grid" class="preview-grid" aria-live="polite"></div>
+      <div class="settings-row">
+        <div><label class="label" for="profile">Scoring profile</label><select id="profile"><option value="prompt_accuracy">Prompt Accuracy</option><option value="visual_balance">Visual Balance</option></select></div>
+        <div class="privacy-note"><span class="shield">◎</span><span><strong>Private by design</strong><br>Images processed in memory. No remote AI API.</span></div>
+      </div>
+      <div class="form-error" id="form-error" role="alert" hidden></div>
+      <button id="analyze-button" class="primary-button" type="button"><span>Analyze and rank</span><span>↗</span></button>
+      <p class="fine-print">First run downloads model weights. Scores are comparative signals, not certainty.</p>
+    </section>
+
+    <section id="results-section" class="results-section" hidden>
+      <div class="results-header"><div><p class="eyebrow">ANALYSIS COMPLETE</p><h2>Ranking report</h2></div><span id="result-device" class="device-chip">LOCAL MODEL</span></div>
+      <div id="winner-card" class="winner-card"></div>
+      <div id="warnings" class="warnings"></div>
+      <div class="ranking-heading"><h3>All candidates</h3><span>Sorted by selected profile</span></div>
+      <div id="ranking-list" class="ranking-list"></div>
+      <p id="score-semantics" class="score-semantics"></p>
+    </section>
+    <footer class="footer"><span>BEST-IMAGE <b>/</b> LOCAL FIRST</span><span>Similarity signals, transparent rules, human judgment.</span></footer>
+  </main>
+  <div id="busy-overlay" class="busy-overlay" hidden><div class="busy-card"><div class="spinner"></div><h3>Comparing candidates</h3><p id="busy-message">Loading the local vision model if needed…</p><span>Keep this tab open</span></div></div>
+  <script src="/static/app.js" defer></script>
+</body>
+</html>
