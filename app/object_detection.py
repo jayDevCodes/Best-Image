@@ -91,6 +91,9 @@ def _read_expected_count(prompt: str, position: int) -> int | None:
     match = matches[-1]
     if len(prefix[match.end():].split()) > 2:
         return None
+    before_number = prefix[:match.start()]
+    if re.search(r"\b(image|picture|photo|candidate|option|version|page|step|frame|figure)\s*$", before_number, re.I):
+        return None
     token = match.group(1).casefold()
     if token.isdigit():
         return min(int(token), 100)
