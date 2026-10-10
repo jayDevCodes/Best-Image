@@ -17,6 +17,8 @@ import sys
 import uuid
 from typing import Any
 
+from app.feedback_insights import tag_feedback_reason
+
 FEATURES = ("prompt_match", "requirement_match", "image_clarity", "technical_quality")
 MIN_FEEDBACK_COMPARISONS = 3
 
@@ -47,12 +49,15 @@ def _connect() -> sqlite3.Connection:
             candidates_json TEXT NOT NULL,
             preferred_index INTEGER,
             feedback_at TEXT,
-            feedback_reason TEXT NOT NULL DEFAULT ''
+            feedback_reason TEXT NOT NULL DEFAULT '',
+            feedback_tags TEXT NOT NULL DEFAULT '[]'
         )"""
     )
     columns = {row["name"] for row in connection.execute("PRAGMA table_info(comparisons)").fetchall()}
     if "feedback_reason" not in columns:
         connection.execute("ALTER TABLE comparisons ADD COLUMN feedback_reason TEXT NOT NULL DEFAULT ''")
+    if "feedback_tags" not in columns:
+        connection.execute("ALTER TABLE comparisons ADD COLUMN feedback_tags TEXT NOT NULL DEFAULT '[]'")
     connection.execute(
         "CREATE INDEX IF NOT EXISTS idx_comparisons_profile_feedback "
         "ON comparisons(profile, preferred_index)"
@@ -106,6 +111,7 @@ def create_comparison(profile: str, model_id: str, candidates: list[dict[str, An
 def record_feedback(task_id: str, preferred_index: int, reason: str = "") -> dict[str, Any]:
     """Save a user's preferred candidate for one comparison."""
     cleaned_reason = " ".join((reason or "").split())[:2000]
+    reason_tags = tag_feedback_reason(cleaned_reason)
     with _database() as connection:
         row = connection.execute(
             "SELECT profile, candidates_json FROM comparisons WHERE task_id = ?",
@@ -119,9 +125,9 @@ def record_feedback(task_id: str, preferred_index: int, reason: str = "") -> dic
             raise ValueError("The selected candidate does not belong to this comparison")
         connection.execute(
             """UPDATE comparisons
-               SET preferred_index = ?, feedback_at = ?, feedback_reason = ?
+               SET preferred_index = ?, feedback_at = ?, feedback_reason = ?, feedback_tags = ?
                WHERE task_id = ?""",
-            (preferred_index, _utc_now(), cleaned_reason, task_id),
+            (preferred_index, _utc_now(), cleaned_reason, json.dumps(reason_tags), task_id),
         )
         count_row = connection.execute(
             "SELECT COUNT(*) AS n FROM comparisons WHERE profile = ? AND preferred_index IS NOT NULL",
@@ -132,6 +138,7 @@ def record_feedback(task_id: str, preferred_index: int, reason: str = "") -> dic
             "feedback_count": int(count_row["n"]),
             "preferred_index": preferred_index,
             "reason_saved": bool(cleaned_reason),
+            "reason_tags": reason_tags,
         }
 
 

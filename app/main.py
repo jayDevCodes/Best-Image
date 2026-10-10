@@ -62,6 +62,7 @@ async def submit_feedback(payload: FeedbackRequest) -> dict[str, Any]:
         "message": "Your preference was saved locally. It will influence future comparisons when enough feedback is available.",
         "feedback_count": learning["feedback_count"],
         "reason_saved": recorded["reason_saved"],
+        "reason_tags": recorded["reason_tags"],
         "personalization": learning,
     }
 

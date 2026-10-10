@@ -60,11 +60,14 @@ def test_analyze_api_with_mocked_model(monkeypatch, tmp_path):
     feedback = client.post("/api/feedback", json={
         "task_id": payload["task_id"],
         "preferred_index": 1,
-        "reason": "Candidate 2 follows the requested color and setting more accurately.",
+        "reason": "Candidate 2 follows the prompt more accurately; its text is spelled correctly and the exact count is three.",
     })
     assert feedback.status_code == 200, feedback.text
     assert feedback.json()["feedback_count"] == 1
     assert feedback.json()["reason_saved"] is True
+    assert "prompt_match" in feedback.json()["reason_tags"]
+    assert "text_or_spelling" in feedback.json()["reason_tags"]
+    assert "object_counting" in feedback.json()["reason_tags"]
     assert feedback.json()["personalization"]["active"] is False
 
     invalid = client.post("/api/feedback", json={
