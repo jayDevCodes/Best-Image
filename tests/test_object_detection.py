@@ -8,8 +8,8 @@ from app.object_detection import (
 
 
 def test_count_parser_ignores_candidate_number():
-    prompt = "Image 2 shows a person beside a bicycle"
-    person = prompt.index("person")
+    prompt = "Image 2 shows several people beside a bicycle"
+    person = prompt.index("people")
     assert _read_expected_count(prompt, person) is None
 
 
