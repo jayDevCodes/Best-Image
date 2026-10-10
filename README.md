@@ -55,6 +55,17 @@ After every comparison the UI asks whether the winner was correct. You can accep
 
 See [docs/FEEDBACK_LEARNING.md](docs/FEEDBACK_LEARNING.md) for the learning rule, data location, reset instructions, and limitations.
 
+## Ranking benchmark
+
+When you have human-labelled comparisons, save them in a JSON Lines file (one JSON object per line). Each object needs the candidate order returned by the ranker and the image that was actually preferred:
+
+```json
+{"ranking":[{"index":2},{"index":0},{"index":1}],"preferred_index":0}
+{"ranking":[0,1,2],"preferred_index":1}
+```
+
+Run `python scripts/evaluate_benchmark.py path/to/labels.jsonl`. The report includes top-1/top-3 accuracy, mean reciprocal rank, mean preferred rank, and a rank histogram. Keep a holdout set that is not used for tuning or preference learning; these metrics are only useful if labels are representative.
+
 ## API
 
 - GET /api/health — readiness, SigLIP status and optional capability availability.
