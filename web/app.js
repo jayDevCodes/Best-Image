@@ -7,7 +7,6 @@ let resultUrls = [];
 let currentTaskId = null;
 let currentWinnerIndex = null;
 let feedbackSaved = false;
-let resultUrls = [];
 
 const promptInput = document.getElementById("prompt");
 const imageInput = document.getElementById("image-input");
@@ -29,10 +28,6 @@ function clearError() { formError.textContent = ""; formError.hidden = true; }
 function releasePreviewUrls() {
   previewUrls.forEach(function (url) { URL.revokeObjectURL(url); });
   previewUrls = [];
-}
-function releaseResultUrls() {
-  resultUrls.forEach(function (url) { URL.revokeObjectURL(url); });
-  resultUrls = [];
 }
 function releaseResultUrls() {
   resultUrls.forEach(function (url) { URL.revokeObjectURL(url); });
