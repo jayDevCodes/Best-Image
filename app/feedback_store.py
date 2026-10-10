@@ -19,7 +19,7 @@ from typing import Any
 
 from app.feedback_insights import CATEGORY_LABELS, tag_feedback_reason
 
-FEATURES = ("prompt_match", "requirement_match", "image_clarity", "technical_quality")
+FEATURES = ("prompt_match", "requirement_match", "object_match", "spatial_match", "text_match", "image_clarity", "technical_quality")
 MIN_FEEDBACK_COMPARISONS = 3
 
 
@@ -166,6 +166,13 @@ def get_feedback_insights() -> dict[str, Any]:
         for tag in set(tags):
             counts[str(tag)] = counts.get(str(tag), 0) + 1
     supported = {"prompt_match", "visual_clarity", "resolution_quality"}
+    from app.ocr import ocr_status
+    from app.object_detection import detector_status
+    if ocr_status()["available"]:
+        supported.add("text_or_spelling")
+    detector = detector_status()
+    if detector["available"]:
+        supported.update({"object_counting", "spatial_relations"})
     themes = [
         {
             "id": tag,

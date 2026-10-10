@@ -6,8 +6,11 @@ from app.config import normalized_weights
 CRITERIA = {
     "prompt_match": "Prompt match",
     "requirement_match": "Inferred detail match",
-    "image_clarity": "Image clarity (heuristic)",
+    "image_clarity": "Edge/contrast heuristic",
     "technical_quality": "Resolution adequacy",
+    "text_match": "Quoted-text OCR match (optional)",
+    "object_match": "Object presence/count (optional detector)",
+    "spatial_match": "2-D left/right/above/below (optional detector)",
 }
 
 def rank_candidates(candidates: list[dict[str, Any]], weights: dict[str, float], requirement_labels: list[str]) -> list[dict[str, Any]]:
@@ -25,6 +28,9 @@ def rank_candidates(candidates: list[dict[str, Any]], weights: dict[str, float],
         }
         if details:
             scores["requirement_match"] = sum(details) / len(details)
+        for optional_signal in ("text_match", "object_match", "spatial_match"):
+            if candidate.get(optional_signal) is not None:
+                scores[optional_signal] = max(0.0, min(100.0, float(candidate[optional_signal])))
         active_weights = normalized_weights(weights, set(scores))
         final_score = sum(scores[key] * weight for key, weight in active_weights.items())
         reasons: list[str] = []
@@ -42,6 +48,12 @@ def rank_candidates(candidates: list[dict[str, Any]], weights: dict[str, float],
             reasons.append("Relatively strong edge clarity and contrast statistics")
         if diagnostics["resolution_score"] < 50:
             reasons.append("Low resolution relative to the app's 1-megapixel reference")
+        if scores.get("text_match", 100.0) < 50:
+            reasons.append("Optional quoted-text OCR found a weak literal match; inspect spelling manually")
+        if scores.get("object_match", 100.0) < 50:
+            reasons.append("Optional detector found a weak supported-object/count match; inspect counts manually")
+        if scores.get("spatial_match", 100.0) < 50:
+            reasons.append("Optional detector found a weak 2-D relation match; inspect placement manually")
         if not reasons:
             reasons.append("Review the score breakdown; no single heuristic dominates")
         ranked.append({
