@@ -49,6 +49,8 @@ BEST_IMAGE_DEVICE=cpu python -m app
 
 The `/api/health` endpoint reports optional capability availability without loading their model weights.
 
+**Optional human-preference reward (ImageReward):** This adds a separate preference-trained signal, but it loads a BLIP-Large backbone and can be expensive in memory and first-download time on an 8 GB Mac. Install the optional package with `pip install -r requirements-reward.txt`, then enable it for a run with `BEST_IMAGE_ENABLE_PREFERENCE_REWARD=1 python -m app`. It is disabled by default and loaded lazily. The app unloads the model after scoring to avoid keeping multiple large backbones in memory. Treat its score as a learned human-preference estimate, not proof that every requested detail is correct. If memory is tight, leave this option off (and also leave the optional detector disabled).
+
 ## Local feedback learning
 
 After every comparison the UI asks whether the winner was correct. You can accept it or select the candidate you actually prefer. Feedback is stored in a local SQLite database, not in the repository. It stores criterion scores, the selected candidate index, and an optional human-written feedback rationale (up to 2,000 characters), not prompts, image bytes, or filenames. After at least three informative reviewed comparisons in the same profile, a regularized pairwise learner adjusts weights for future tasks. It does not fine-tune the SigLIP foundation model.
