@@ -16,6 +16,8 @@ from app.config import load_profiles
 from app.feedback_store import create_comparison, get_feedback_insights, get_profile_learning, record_feedback
 from app.image_processing import MAX_IMAGE_BYTES, MAX_TOTAL_UPLOAD_BYTES, ImageValidationError, PreparedImage, decode_image
 from app.model import ModelUnavailableError, scorer
+from app.ocr import analyze_text_prompt, ocr_status
+from app.object_detection import detector_status, score_object_requirements
 from app.ranker import rank_candidates
 from app.requirements_parser import extract_requirements, review_warnings
 
@@ -66,7 +68,17 @@ async def index() -> FileResponse:
 
 @app.get("/api/health")
 async def health() -> dict[str, Any]:
-    return {"ok": True, "app": "Best-Image", "version": "0.1.0", "model": scorer.status()}
+    # Capability checks inspect dependencies only; they do not load model weights.
+    return {
+        "ok": True,
+        "app": "Best-Image",
+        "version": "0.2.0",
+        "model": scorer.status(),
+        "capabilities": {
+            "ocr": ocr_status(),
+            "object_detection": detector_status(),
+        },
+    }
 
 @app.post("/api/feedback")
 async def submit_feedback(payload: FeedbackRequest) -> dict[str, Any]:
@@ -149,15 +161,39 @@ async def analyze(
     except ModelUnavailableError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
+    # Optional checks execute locally only. Their failure never replaces the baseline scorer.
+    image_list = [item.image for item in decoded]
+    text_analysis = await run_in_threadpool(analyze_text_prompt, cleaned_prompt, image_list)
+    object_analysis = await run_in_threadpool(score_object_requirements, cleaned_prompt, image_list)
+
     candidates: list[dict[str, Any]] = []
     for index, prepared in enumerate(decoded):
-        candidates.append({
+        candidate: dict[str, Any] = {
             "index": index,
             "filename": prepared.filename,
             "prompt_match": model_result["prompt_scores"][index],
             "requirement_scores": model_result["requirement_scores"][index],
             "diagnostics": prepared.diagnostics,
-        })
+        }
+        if isinstance(text_analysis.get("scores"), list):
+            candidate["text_match"] = text_analysis["scores"][index]
+        if isinstance(object_analysis.get("object_scores"), list):
+            candidate["object_match"] = object_analysis["object_scores"][index]
+        if isinstance(object_analysis.get("spatial_scores"), list):
+            candidate["spatial_match"] = object_analysis["spatial_scores"][index]
+        candidates.append(candidate)
+
+    warning_list = review_warnings(
+        cleaned_prompt,
+        ocr_available=bool(text_analysis.get("available")),
+        ocr_scored=bool(text_analysis.get("used") and text_analysis.get("scores") is not None),
+        object_scored=bool(object_analysis.get("used") and object_analysis.get("object_scores") is not None),
+        spatial_scored=bool(object_analysis.get("used") and object_analysis.get("spatial_scores") is not None),
+    )
+    for warning in (text_analysis.get("warning"), object_analysis.get("warning")):
+        if isinstance(warning, str) and warning and warning not in warning_list:
+            warning_list.append(warning)
+
     ranking = rank_candidates(candidates, learning["weights"], requirement_labels)
     task_id = create_comparison(profile, model_result["model"], ranking)
     top_gap = ranking[0]["score"] - ranking[1]["score"]
@@ -174,7 +210,22 @@ async def analyze(
         "model": model_result["model"],
         "device": model_result["device"],
         "requirements": requirement_labels,
-        "warnings": review_warnings(cleaned_prompt),
+        "capabilities": {
+            "ocr": {
+                **ocr_status(),
+                "used": bool(text_analysis.get("used")),
+                "message": text_analysis.get("message"),
+                "warning": text_analysis.get("warning"),
+            },
+            "object_detection": {
+                **detector_status(),
+                "used": bool(object_analysis.get("used")),
+                "analysis_available": bool(object_analysis.get("available")),
+                "message": object_analysis.get("message"),
+                "warning": object_analysis.get("warning"),
+            },
+        },
+        "warnings": warning_list,
         "ranking": ranking,
         "score_semantics": (
             "Scores are comparative heuristic indices from similarity and image statistics, "
