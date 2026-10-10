@@ -34,7 +34,7 @@ def review_warnings(
         prompt, re.IGNORECASE,
     )
     text_requested = re.search(
-        r"\b(text|spell|spelling|lettering|logo|sign|caption|written|words?|says?|reads?|printed)\b",
+        r"\b(text|spell|spelling|lettering|logo|sign|caption|written|words?|says?|read(?:s|ing)?|printed)\b",
         prompt, re.IGNORECASE,
     )
     spatial_requested = re.search(
