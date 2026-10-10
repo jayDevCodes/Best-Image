@@ -23,4 +23,4 @@ jobs:
       - name: Install test dependencies
         run: python -m pip install -r requirements-test.txt
       - name: Run tests without downloading model weights
-        run: pytest -q
+        run: python -m pytest -q
