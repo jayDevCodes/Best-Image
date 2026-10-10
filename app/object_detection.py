@@ -292,3 +292,21 @@ def score_object_requirements(prompt: str, images: list[Any]) -> dict[str, Any]:
             "message": "Optional object detection failed: " + type(exc).__name__,
             "warning": "The optional detector failed to load or run. The baseline similarity ranking was used; review counts and placement manually.",
         }
+
+
+def unload_object_detector() -> None:
+    """Release optional detector weights before swapping to another large model."""
+    global _MODEL
+    import gc
+    with _LOCK:
+        model = _MODEL
+        _MODEL = None
+        if model is not None:
+            try:
+                import torch
+                if hasattr(torch, "mps") and hasattr(torch.mps, "empty_cache"):
+                    torch.mps.empty_cache()
+            except Exception:
+                pass
+        del model
+    gc.collect()
