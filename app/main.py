@@ -1,6 +1,7 @@
 """FastAPI application for the local Best-Image evaluator."""
 from __future__ import annotations
 import os
+import threading
 from pathlib import Path
 from typing import Any
 
@@ -17,7 +18,8 @@ from app.feedback_store import create_comparison, get_feedback_insights, get_pro
 from app.image_processing import MAX_IMAGE_BYTES, MAX_TOTAL_UPLOAD_BYTES, ImageValidationError, PreparedImage, decode_image
 from app.model import ModelUnavailableError, scorer
 from app.ocr import analyze_text_prompt, ocr_status
-from app.object_detection import detector_status, score_object_requirements
+from app.object_detection import detector_status, score_object_requirements, unload_object_detector
+from app.preference_reward import preference_reward_status, score_preference_reward, unload_preference_reward
 from app.ranker import rank_candidates
 from app.requirements_parser import extract_requirements, review_warnings
 
@@ -26,6 +28,41 @@ WEB_DIR = ROOT / "web"
 MAX_IMAGES = 6
 MIN_IMAGES = 2
 MAX_PROMPT_CHARS = 2000
+_ANALYSIS_LOCK = threading.RLock()
+
+
+def _run_visual_pipeline(prompt: str, requirement_labels: list[str], images: list[Any]) -> dict[str, Any]:
+    """Run large local vision models serially to limit peak memory on small Macs."""
+    with _ANALYSIS_LOCK:
+        if preference_reward_status().get("loaded"):
+            unload_preference_reward()
+        if detector_status().get("loaded"):
+            unload_object_detector()
+
+        # SigLIP remains the core required scorer; optional capabilities cannot replace it.
+        model_result = scorer.score(prompt, requirement_labels, images)
+        text_analysis = analyze_text_prompt(prompt, images)
+
+        reward_status = preference_reward_status()
+        if reward_status.get("available"):
+            # ImageReward uses a BLIP-Large backbone; avoid keeping SigLIP resident too.
+            scorer.unload()
+        reward_analysis = score_preference_reward(prompt, images)
+        if reward_status.get("available") or reward_analysis.get("used"):
+            unload_preference_reward()
+
+        object_status = detector_status()
+        if object_status.get("available"):
+            # Keep only one large backbone resident at a time.
+            scorer.unload()
+            unload_preference_reward()
+        object_analysis = score_object_requirements(prompt, images)
+        return {
+            "model": model_result,
+            "text": text_analysis,
+            "preference_reward": reward_analysis,
+            "objects": object_analysis,
+        }
 
 
 class FeedbackRequest(BaseModel):
@@ -34,7 +71,7 @@ class FeedbackRequest(BaseModel):
     reason: str = Field(default="", max_length=2000)
 
 app = FastAPI(
-    title="Best-Image", version="0.1.0",
+    title="Best-Image", version="0.2.0",
     description="Local prompt-to-image comparison and ranking.",
     docs_url="/api/docs", redoc_url=None,
 )
@@ -77,6 +114,7 @@ async def health() -> dict[str, Any]:
         "capabilities": {
             "ocr": ocr_status(),
             "object_detection": detector_status(),
+            "preference_reward": preference_reward_status(),
         },
     }
 
@@ -154,17 +192,18 @@ async def analyze(
     requirement_labels = extract_requirements(cleaned_prompt)
     base_weights = configured_profiles[profile]["weights"]
     learning = get_profile_learning(profile, base_weights)
+    image_list = [item.image for item in decoded]
     try:
-        model_result = await run_in_threadpool(
-            scorer.score, cleaned_prompt, requirement_labels, [item.image for item in decoded]
+        vision_result = await run_in_threadpool(
+            _run_visual_pipeline, cleaned_prompt, requirement_labels, image_list
         )
     except ModelUnavailableError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
-    # Optional checks execute locally only. Their failure never replaces the baseline scorer.
-    image_list = [item.image for item in decoded]
-    text_analysis = await run_in_threadpool(analyze_text_prompt, cleaned_prompt, image_list)
-    object_analysis = await run_in_threadpool(score_object_requirements, cleaned_prompt, image_list)
+    model_result = vision_result["model"]
+    text_analysis = vision_result["text"]
+    reward_analysis = vision_result["preference_reward"]
+    object_analysis = vision_result["objects"]
 
     candidates: list[dict[str, Any]] = []
     for index, prepared in enumerate(decoded):
@@ -177,6 +216,8 @@ async def analyze(
         }
         if isinstance(text_analysis.get("scores"), list):
             candidate["text_match"] = text_analysis["scores"][index]
+        if isinstance(reward_analysis.get("scores"), list):
+            candidate["preference_match"] = reward_analysis["scores"][index]
         if isinstance(object_analysis.get("object_scores"), list):
             candidate["object_match"] = object_analysis["object_scores"][index]
         if isinstance(object_analysis.get("spatial_scores"), list):
@@ -190,7 +231,11 @@ async def analyze(
         object_scored=bool(object_analysis.get("used") and object_analysis.get("object_scores") is not None),
         spatial_scored=bool(object_analysis.get("used") and object_analysis.get("spatial_scores") is not None),
     )
-    for warning in (text_analysis.get("warning"), object_analysis.get("warning")):
+    for warning in (
+        text_analysis.get("warning"),
+        object_analysis.get("warning"),
+        reward_analysis.get("warning"),
+    ):
         if isinstance(warning, str) and warning and warning not in warning_list:
             warning_list.append(warning)
 
@@ -224,11 +269,17 @@ async def analyze(
                 "message": object_analysis.get("message"),
                 "warning": object_analysis.get("warning"),
             },
+            "preference_reward": {
+                **preference_reward_status(),
+                "used": bool(reward_analysis.get("used")),
+                "message": reward_analysis.get("message"),
+                "warning": reward_analysis.get("warning"),
+            },
         },
         "warnings": warning_list,
         "ranking": ranking,
         "score_semantics": (
-            "Scores combine prompt similarity, available optional local OCR/object signals, and image-statistic diagnostics. "
+            "Scores combine prompt similarity, available optional local OCR/object and human-preference signals, and image-statistic diagnostics. "
             "They are comparative heuristic indices, not calibrated probabilities or guaranteed correctness."
         ),
         "winner_index": ranking[0]["index"],
