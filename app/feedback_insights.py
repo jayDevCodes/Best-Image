@@ -12,9 +12,9 @@ CATEGORY_LABELS = {
     "prompt_match": "Prompt / subject match",
     "visual_clarity": "Sharpness / visual clarity",
     "resolution_quality": "Resolution / technical quality",
-    "text_or_spelling": "Text / spelling verification (not currently implemented)",
-    "object_counting": "Exact object counting (not currently implemented)",
-    "spatial_relations": "Spatial relations (not reliably verified)",
+    "text_or_spelling": "Text / spelling (optional local OCR signal)",
+    "object_counting": "Object counting (optional COCO classes only)",
+    "spatial_relations": "Spatial relations (simple 2-D estimate only)",
     "composition": "Composition / framing",
     "other": "Other / general feedback",
 }
