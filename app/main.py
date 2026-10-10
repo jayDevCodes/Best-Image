@@ -228,8 +228,8 @@ async def analyze(
         "warnings": warning_list,
         "ranking": ranking,
         "score_semantics": (
-            "Scores are comparative heuristic indices from similarity and image statistics, "
-            "not calibrated probabilities or guaranteed correctness."
+            "Scores combine prompt similarity, available optional local OCR/object signals, and image-statistic diagnostics. "
+            "They are comparative heuristic indices, not calibrated probabilities or guaranteed correctness."
         ),
         "winner_index": ranking[0]["index"],
         "winner_gap": round(top_gap, 2),
