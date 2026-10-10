@@ -5,13 +5,14 @@ from app.feedback_store import (
 )
 
 BASELINE = {
-    "prompt_match": 0.50,
-    "requirement_match": 0.24,
-    "object_match": 0.10,
-    "spatial_match": 0.05,
+    "prompt_match": 0.46,
+    "requirement_match": 0.22,
+    "object_match": 0.08,
+    "spatial_match": 0.04,
     "text_match": 0.06,
-    "image_clarity": 0.03,
-    "technical_quality": 0.02,
+    "preference_match": 0.10,
+    "image_clarity": 0.025,
+    "technical_quality": 0.015,
 }
 
 def comparison_candidates():
