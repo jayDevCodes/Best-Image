@@ -12,6 +12,8 @@ def test_health_does_not_load_model_weights():
     payload = response.json()
     assert payload["ok"] is True
     assert payload["model"]["loaded"] is False
+    assert "ocr" in payload["capabilities"]
+    assert "object_detection" in payload["capabilities"]
 
 def test_profiles_are_exposed():
     response = client.get("/api/profiles")
@@ -56,6 +58,10 @@ def test_analyze_api_with_mocked_model(monkeypatch, tmp_path):
     assert payload["task_id"]
     assert payload["personalization"]["active"] is False
     assert "spatial relation" in " ".join(payload["warnings"])
+    assert "text_match" not in payload["ranking"][0]["criteria"]
+    assert "object_match" not in payload["ranking"][0]["criteria"]
+    assert payload["capabilities"]["ocr"]["used"] is False
+    assert payload["capabilities"]["object_detection"]["used"] is False
 
     feedback = client.post("/api/feedback", json={
         "task_id": payload["task_id"],
@@ -100,3 +106,52 @@ def test_extension_origin_is_allowed_through_origin_guard():
         headers={"Origin": "chrome-extension://abcdefghijklmnop"},
     )
     assert response.status_code == 404
+
+
+def test_optional_visual_signals_are_added_only_when_available(monkeypatch, tmp_path):
+    monkeypatch.setenv("BEST_IMAGE_DB_PATH", str(tmp_path / "feedback.sqlite3"))
+
+    def fake_score(prompt, requirements, images):
+        return {
+            "prompt_scores": [80.0, 70.0],
+            "requirement_scores": [[], []],
+            "model": "fake-test-scorer",
+            "device": "cpu",
+        }
+
+    def fake_text(prompt, images):
+        return {
+            "available": True, "used": True, "scores": [95.0, 10.0],
+            "message": "test OCR", "warning": "test OCR warning", "expected_count": 1,
+        }
+
+    def fake_objects(prompt, images):
+        return {
+            "available": True, "used": True,
+            "object_scores": [100.0, 0.0], "spatial_scores": [100.0, 0.0],
+            "message": "test detector", "warning": "test detector warning",
+        }
+
+    monkeypatch.setattr(main_module.scorer, "score", fake_score)
+    monkeypatch.setattr(main_module, "analyze_text_prompt", fake_text)
+    monkeypatch.setattr(main_module, "score_object_requirements", fake_objects)
+    monkeypatch.setattr(main_module, "ocr_status", lambda: {"available": True, "message": "ready"})
+    monkeypatch.setattr(main_module, "detector_status", lambda: {"available": True, "message": "ready"})
+
+    response = client.post(
+        "/api/analyze",
+        data={"prompt": 'A sign reading "OPEN" with exactly two bicycles to the left of a bus', "profile": "prompt_accuracy"},
+        files=[
+            ("images", ("candidate-a.png", png_bytes((180, 20, 30)), "image/png")),
+            ("images", ("candidate-b.png", png_bytes((20, 30, 180)), "image/png")),
+        ],
+    )
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    by_index = {item["index"]: item for item in payload["ranking"]}
+    assert by_index[0]["criteria"]["text_match"]["score"] == 95.0
+    assert by_index[0]["criteria"]["object_match"]["score"] == 100.0
+    assert by_index[0]["criteria"]["spatial_match"]["score"] == 100.0
+    assert payload["capabilities"]["ocr"]["used"] is True
+    assert payload["capabilities"]["object_detection"]["used"] is True
+    assert any("Optional local OCR" in item for item in payload["warnings"])
