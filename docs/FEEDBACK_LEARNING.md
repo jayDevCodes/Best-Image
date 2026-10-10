@@ -2,7 +2,7 @@
 
 ## User experience
 
-After an image comparison, the UI asks whether the recommended image matches the user's judgment. The user can accept the current winner or explicitly choose another candidate. Feedback applies only to that comparison and is saved locally.
+After an image comparison, the UI asks whether the recommended image matches the user's judgment. The user can accept the current winner or explicitly choose another candidate. The Chrome companion can also keep a lightweight, local thumbnail review pending across page navigation, then let the user choose the actual best candidate and capture a human-written rationale from the next page. Feedback applies only to that comparison and is saved locally.
 
 ## What is learned
 
@@ -17,7 +17,7 @@ It is local, small, reversible, and testable without training a neural network. 
 ## API
 
 - `POST /api/analyze` returns a local `task_id`, the active profile weights, and personalization status.
-- `POST /api/feedback` accepts JSON: `{"task_id":"...","preferred_index":1}`.
+- `POST /api/feedback` accepts JSON: `{"task_id":"...","preferred_index":1,"reason":"Optional explanation"}`. The reason is optional and capped at 2,000 characters.
 - `GET /api/health` shows the local model status.
 
 ## Data location and privacy
@@ -27,7 +27,7 @@ The database is stored outside the repository:
 - Other platforms: `$XDG_DATA_HOME/Best-Image/feedback.sqlite3` or `~/.local/share/Best-Image/feedback.sqlite3`
 - Set `BEST_IMAGE_DB_PATH` to override this path (useful for tests or a separate local profile).
 
-Only score features, a random task ID, model identifier, profile and preferred candidate index are stored. No prompt, filenames or images are saved by the feedback store. The local SQLite database can be deleted to reset personalization.
+The local database stores score features, a random task ID, model identifier, profile, preferred candidate index, and an optional user-entered feedback reason (up to 2,000 characters). No prompt, filenames or full images are saved by the feedback store. The browser extension may separately retain small thumbnail previews locally until deferred feedback is submitted or discarded. The local SQLite database can be deleted to reset personalization.
 
 ## Limitations
 

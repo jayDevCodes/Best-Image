@@ -27,6 +27,7 @@ MAX_PROMPT_CHARS = 2000
 class FeedbackRequest(BaseModel):
     task_id: str = Field(min_length=1, max_length=64)
     preferred_index: int
+    reason: str = Field(default="", max_length=2000)
 
 app = FastAPI(
     title="Best-Image", version="0.1.0",
@@ -47,7 +48,7 @@ async def health() -> dict[str, Any]:
 async def submit_feedback(payload: FeedbackRequest) -> dict[str, Any]:
     """Record which candidate the user actually preferred for a completed task."""
     try:
-        recorded = record_feedback(payload.task_id, payload.preferred_index)
+        recorded = record_feedback(payload.task_id, payload.preferred_index, payload.reason)
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except ValueError as exc:
@@ -60,6 +61,7 @@ async def submit_feedback(payload: FeedbackRequest) -> dict[str, Any]:
         "ok": True,
         "message": "Your preference was saved locally. It will influence future comparisons when enough feedback is available.",
         "feedback_count": learning["feedback_count"],
+        "reason_saved": recorded["reason_saved"],
         "personalization": learning,
     }
 

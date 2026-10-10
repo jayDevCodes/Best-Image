@@ -38,8 +38,9 @@ def comparison_candidates():
 def test_feedback_is_persisted_without_prompt_or_filename(monkeypatch, tmp_path):
     monkeypatch.setenv("BEST_IMAGE_DB_PATH", str(tmp_path / "feedback.sqlite3"))
     task_id = create_comparison("prompt_accuracy", "test-model", comparison_candidates())
-    feedback = record_feedback(task_id, 1)
+    feedback = record_feedback(task_id, 1, "The bicycle wheels and handlebars match the prompt.")
     assert feedback["feedback_count"] == 1
+    assert feedback["reason_saved"] is True
     learning = get_profile_learning("prompt_accuracy", BASELINE)
     assert learning["active"] is False
     assert learning["feedback_count"] == 1
@@ -47,11 +48,12 @@ def test_feedback_is_persisted_without_prompt_or_filename(monkeypatch, tmp_path)
     import sqlite3
     connection = sqlite3.connect(tmp_path / "feedback.sqlite3")
     try:
-        stored = connection.execute("SELECT candidates_json FROM comparisons").fetchone()[0]
+        stored, reason = connection.execute("SELECT candidates_json, feedback_reason FROM comparisons").fetchone()
     finally:
         connection.close()
     assert "private-photo-filename" not in stored
     assert '"prompt"' not in stored
+    assert reason == "The bicycle wheels and handlebars match the prompt."
 
 def test_personal_weights_activate_after_multiple_reviewed_tasks(monkeypatch, tmp_path):
     monkeypatch.setenv("BEST_IMAGE_DB_PATH", str(tmp_path / "feedback.sqlite3"))

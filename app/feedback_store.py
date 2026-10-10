@@ -46,9 +46,13 @@ def _connect() -> sqlite3.Connection:
             model_id TEXT NOT NULL,
             candidates_json TEXT NOT NULL,
             preferred_index INTEGER,
-            feedback_at TEXT
+            feedback_at TEXT,
+            feedback_reason TEXT NOT NULL DEFAULT ''
         )"""
     )
+    columns = {row["name"] for row in connection.execute("PRAGMA table_info(comparisons)").fetchall()}
+    if "feedback_reason" not in columns:
+        connection.execute("ALTER TABLE comparisons ADD COLUMN feedback_reason TEXT NOT NULL DEFAULT ''")
     connection.execute(
         "CREATE INDEX IF NOT EXISTS idx_comparisons_profile_feedback "
         "ON comparisons(profile, preferred_index)"
@@ -99,8 +103,9 @@ def create_comparison(profile: str, model_id: str, candidates: list[dict[str, An
     return task_id
 
 
-def record_feedback(task_id: str, preferred_index: int) -> dict[str, Any]:
-    """Save or replace a user's preferred candidate for one comparison."""
+def record_feedback(task_id: str, preferred_index: int, reason: str = "") -> dict[str, Any]:
+    """Save a user's preferred candidate for one comparison."""
+    cleaned_reason = " ".join((reason or "").split())[:2000]
     with _database() as connection:
         row = connection.execute(
             "SELECT profile, candidates_json FROM comparisons WHERE task_id = ?",
@@ -113,8 +118,10 @@ def record_feedback(task_id: str, preferred_index: int) -> dict[str, Any]:
         if preferred_index not in candidate_indexes:
             raise ValueError("The selected candidate does not belong to this comparison")
         connection.execute(
-            "UPDATE comparisons SET preferred_index = ?, feedback_at = ? WHERE task_id = ?",
-            (preferred_index, _utc_now(), task_id),
+            """UPDATE comparisons
+               SET preferred_index = ?, feedback_at = ?, feedback_reason = ?
+               WHERE task_id = ?""",
+            (preferred_index, _utc_now(), cleaned_reason, task_id),
         )
         count_row = connection.execute(
             "SELECT COUNT(*) AS n FROM comparisons WHERE profile = ? AND preferred_index IS NOT NULL",
@@ -124,6 +131,7 @@ def record_feedback(task_id: str, preferred_index: int) -> dict[str, Any]:
             "profile": row["profile"],
             "feedback_count": int(count_row["n"]),
             "preferred_index": preferred_index,
+            "reason_saved": bool(cleaned_reason),
         }
 
 

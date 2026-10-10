@@ -40,7 +40,7 @@ BEST_IMAGE_DEVICE=cpu python -m app
 
 ## Local feedback learning
 
-After every comparison the UI asks whether the winner was correct. You can accept it or select the candidate you actually prefer. Feedback is stored in a local SQLite database, not in the repository. It stores only criterion scores and the selected candidate index, not prompts, image bytes, or filenames. After at least three informative reviewed comparisons in the same profile, a regularized pairwise learner adjusts weights for future tasks. It does not fine-tune the SigLIP foundation model.
+After every comparison the UI asks whether the winner was correct. You can accept it or select the candidate you actually prefer. Feedback is stored in a local SQLite database, not in the repository. It stores criterion scores, the selected candidate index, and an optional human-written feedback rationale (up to 2,000 characters), not prompts, image bytes, or filenames. After at least three informative reviewed comparisons in the same profile, a regularized pairwise learner adjusts weights for future tasks. It does not fine-tune the SigLIP foundation model.
 
 See [docs/FEEDBACK_LEARNING.md](docs/FEEDBACK_LEARNING.md) for the learning rule, data location, reset instructions, and limitations.
 
@@ -49,6 +49,7 @@ See [docs/FEEDBACK_LEARNING.md](docs/FEEDBACK_LEARNING.md) for the learning rule
 - GET /api/health — readiness and model status.
 - GET /api/profiles — available scoring profiles.
 - POST /api/analyze — multipart form with prompt, profile, and 2–6 files under images.
+- POST /api/feedback — JSON with task_id, preferred_index, and optional reason (max 2,000 characters).
 - GET / — local interface.
 
 ## Scoring
@@ -69,7 +70,7 @@ See docs/ARCHITECTURE.md for module boundaries and roadmap.
 
 1. v0.1: local evaluator and transparent baseline.
 2. v0.2: local feedback capture and profile-level pairwise personalization (current).
-3. v0.3: browser extension, optional OCR, and a small vision-language judge.
+3. v0.3: browser extension with deferred feedback capture, optional OCR, and a small vision-language judge.
 4. v0.4: labelled evaluation set, calibration, and benchmark reporting.
 
 ## License
