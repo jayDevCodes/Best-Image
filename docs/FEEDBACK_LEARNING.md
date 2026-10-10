@@ -8,11 +8,11 @@ After an image comparison, the UI asks whether the recommended image matches the
 
 Best-Image stores criterion score vectors for the candidates and the chosen candidate index. It does not store the prompt text, source filenames, or image bytes. A regularized Bradley-Terry-style pairwise learner fits a non-negative weight vector on a simplex for each scoring profile. For one feedback record, the chosen image is treated as preferred over each alternative in that same comparison.
 
-The learned vector is anchored to the profile's existing weights. Personalization is enabled only after at least three reviewed comparisons and at least three informative pairwise differences. The new vector is then used for future tasks on the same profile. User feedback can be replaced if corrected through the API, and it does not update the foundation model weights. Free-text rationale tags are diagnostic only; they do not currently influence the ranker, and tags for OCR/counting/spatial checks explicitly point to capabilities not yet implemented.
+The learned vector is anchored to the profile's existing weights. Personalization is enabled only after at least three reviewed comparisons and at least three informative pairwise differences. The new vector is then used for future tasks on the same profile. User feedback can be replaced if corrected through the API, and it does not update the foundation model weights. Free-text rationale tags are diagnostic only; they do not currently influence the ranker, and tags for OCR/counting/spatial checks are diagnostic; optional local signals are reported separately when available.
 
 ## Why this approach first
 
-It is local, small, reversible, and testable without training a neural network. It optimizes relative preferences for the available scoring signals; it does not magically teach the model visual concepts the base scorer cannot detect. For example, if a user prefers accurate lettering but v0.1 has no OCR score, feedback cannot reliably create an OCR capability. Optional OCR/VLM/reward-model features can be added later.
+It is local, small, reversible, and testable without training a neural network. It optimizes relative preferences for the available scoring signals; it does not magically teach the model visual concepts the base scorer cannot detect. For example, if a user prefers accurate lettering but OCR is not installed or the prompt does not provide quoted expected text, feedback cannot reliably create that capability. Optional local OCR is now available; a COCO detector can also estimate supported object counts and simple 2-D relations when explicitly enabled. Neither expands the base model's class set or guarantees correctness.
 
 ## API
 
