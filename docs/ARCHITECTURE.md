@@ -19,13 +19,20 @@
 - app/ranker.py: deterministic weighted scoring and explanations.
 - app/config.py and config/scoring_profiles.json: profile definitions and validation.
 - web/: dependency-free HTML/CSS/JavaScript frontend.
-- tests/: model-free tests for contracts, ranking, image validation, and API readiness.
+- app/feedback_store.py: local SQLite preference records, pairwise weight learning, and data-minimizing persistence.
+- tests/: model-free tests for contracts, ranking, image validation, feedback learning, and API readiness.
 
 ## Score semantics
 
 Each score is a 0–100 heuristic index. The SigLIP score is sigmoid-transformed model similarity; it is not a calibrated probability that the image is correct. Requirement match averages scores from prompt clauses inferred by a delimiter parser. Image clarity is based on edge and contrast statistics; technical quality is based on a resolution reference. Combined rank scores should only be compared among images in the same task/profile.
 
 Object counts, exact text, logos, fine spatial reasoning, hands/faces defects, and aesthetics are not independently verified reliably by this baseline. The API emits warnings where prompt text suggests count, lettering, or spatial requirements. Human review is recommended for those cases.
+
+## Feedback and personalization
+
+Each completed analysis receives a random task ID. The feedback endpoint records the chosen candidate index and the candidate criterion score vectors; raw prompts, filenames, and image bytes are not stored. A regularized Bradley-Terry-style learner estimates a non-negative weight vector constrained to sum to one. Its solution remains anchored to the configured profile weights and activates only after at least three reviewed comparisons and three informative pairwise comparisons. Future tasks use those learned weights for the same profile.
+
+This adapts the balance between the existing criteria only; it does not fine-tune SigLIP or add missing visual capabilities. The database is outside the repository and can be reset by deleting the local SQLite database. See FEEDBACK_LEARNING.md.
 
 ## Resource behavior
 

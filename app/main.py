@@ -5,11 +5,13 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from pydantic import BaseModel, Field
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.config import load_profiles
+from app.feedback_store import create_comparison, get_profile_learning, record_feedback
 from app.image_processing import MAX_IMAGE_BYTES, MAX_TOTAL_UPLOAD_BYTES, ImageValidationError, PreparedImage, decode_image
 from app.model import ModelUnavailableError, scorer
 from app.ranker import rank_candidates
@@ -20,6 +22,11 @@ WEB_DIR = ROOT / "web"
 MAX_IMAGES = 6
 MIN_IMAGES = 2
 MAX_PROMPT_CHARS = 2000
+
+
+class FeedbackRequest(BaseModel):
+    task_id: str = Field(min_length=1, max_length=64)
+    preferred_index: int
 
 app = FastAPI(
     title="Best-Image", version="0.1.0",
@@ -35,6 +42,27 @@ async def index() -> FileResponse:
 @app.get("/api/health")
 async def health() -> dict[str, Any]:
     return {"ok": True, "app": "Best-Image", "version": "0.1.0", "model": scorer.status()}
+
+@app.post("/api/feedback")
+async def submit_feedback(payload: FeedbackRequest) -> dict[str, Any]:
+    """Record which candidate the user actually preferred for a completed task."""
+    try:
+        recorded = record_feedback(payload.task_id, payload.preferred_index)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    configured_profiles = load_profiles()
+    profile = recorded["profile"]
+    learning = get_profile_learning(profile, configured_profiles[profile]["weights"])
+    return {
+        "ok": True,
+        "message": "Your preference was saved locally. It will influence future comparisons when enough feedback is available.",
+        "feedback_count": learning["feedback_count"],
+        "personalization": learning,
+    }
+
 
 @app.get("/api/profiles")
 async def profiles() -> dict[str, Any]:
@@ -79,6 +107,8 @@ async def analyze(
             await upload.close()
 
     requirement_labels = extract_requirements(cleaned_prompt)
+    base_weights = configured_profiles[profile]["weights"]
+    learning = get_profile_learning(profile, base_weights)
     try:
         model_result = await run_in_threadpool(
             scorer.score, cleaned_prompt, requirement_labels, [item.image for item in decoded]
@@ -95,15 +125,19 @@ async def analyze(
             "requirement_scores": model_result["requirement_scores"][index],
             "diagnostics": prepared.diagnostics,
         })
-    ranking = rank_candidates(candidates, configured_profiles[profile]["weights"], requirement_labels)
+    ranking = rank_candidates(candidates, learning["weights"], requirement_labels)
+    task_id = create_comparison(profile, model_result["model"], ranking)
     top_gap = ranking[0]["score"] - ranking[1]["score"]
     return {
+        "task_id": task_id,
         "prompt": cleaned_prompt,
         "profile": {
             "id": profile,
             "label": configured_profiles[profile]["label"],
-            "weights": configured_profiles[profile]["weights"],
+            "weights": learning["weights"],
+            "base_weights": base_weights,
         },
+        "personalization": learning,
         "model": model_result["model"],
         "device": model_result["device"],
         "requirements": requirement_labels,

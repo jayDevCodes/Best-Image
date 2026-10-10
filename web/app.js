@@ -4,6 +4,10 @@ const MAX_BYTES = 15 * 1024 * 1024;
 let selectedFiles = [];
 let previewUrls = [];
 let resultUrls = [];
+let currentTaskId = null;
+let currentWinnerIndex = null;
+let feedbackSaved = false;
+let resultUrls = [];
 
 const promptInput = document.getElementById("prompt");
 const imageInput = document.getElementById("image-input");
@@ -25,6 +29,10 @@ function clearError() { formError.textContent = ""; formError.hidden = true; }
 function releasePreviewUrls() {
   previewUrls.forEach(function (url) { URL.revokeObjectURL(url); });
   previewUrls = [];
+}
+function releaseResultUrls() {
+  resultUrls.forEach(function (url) { URL.revokeObjectURL(url); });
+  resultUrls = [];
 }
 function releaseResultUrls() {
   resultUrls.forEach(function (url) { URL.revokeObjectURL(url); });
@@ -117,6 +125,30 @@ function renderResults(payload) {
   }
   const winnerUrl = makeUrl(winner.index);
   document.getElementById("result-device").textContent = (payload.device || "local").toUpperCase() + " · " + payload.model;
+  currentTaskId = payload.task_id;
+  currentWinnerIndex = winner.index;
+  feedbackSaved = false;
+  const learning = payload.personalization || {};
+  const learningStatus = document.getElementById("learning-status");
+  learningStatus.textContent = learning.active ? "Personalized · " + learning.feedback_count + " reviews" : "Learning: " + (learning.feedback_count || 0) + "/" + (learning.minimum_feedback || 3);
+  learningStatus.title = learning.message || "Local preference learning status";
+  const feedbackPanel = document.getElementById("feedback-panel");
+  feedbackPanel.hidden = false;
+  document.getElementById("feedback-choice-panel").hidden = true;
+  document.getElementById("feedback-status").textContent = "";
+  document.getElementById("feedback-yes").disabled = false;
+  document.getElementById("feedback-no").disabled = false;
+  document.getElementById("feedback-submit").disabled = false;
+  const preferredSelect = document.getElementById("preferred-candidate");
+  preferredSelect.replaceChildren();
+  ranking.forEach(function (item) {
+    const option = document.createElement("option");
+    option.value = String(item.index);
+    option.textContent = item.rank + ". " + item.filename + (item.index === winner.index ? " (current pick)" : "");
+    preferredSelect.append(option);
+  });
+  const alternative = ranking.find(function (item) { return item.index !== winner.index; });
+  if (alternative) preferredSelect.value = String(alternative.index);
   document.getElementById("winner-card").innerHTML =
     '<div class="winner-preview"><img src="' + winnerUrl + '" alt="Top-ranked candidate ' + escapeHtml(winner.filename) + '"></div>' +
     '<div class="winner-content"><span class="winner-label">TOP RECOMMENDATION</span><h3 class="winner-title">' +
@@ -153,6 +185,45 @@ function renderResults(payload) {
   resultsSection.hidden = false;
   resultsSection.scrollIntoView({behavior: "smooth", block: "start"});
 }
+
+async function submitPreference(preferredIndex) {
+  if (!currentTaskId || feedbackSaved) return;
+  const status = document.getElementById("feedback-status");
+  const buttons = [document.getElementById("feedback-yes"), document.getElementById("feedback-no"), document.getElementById("feedback-submit")];
+  buttons.forEach(function (button) { button.disabled = true; });
+  status.textContent = "Saving preference locally…";
+  try {
+    const response = await fetch("/api/feedback", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({task_id: currentTaskId, preferred_index: Number(preferredIndex)})
+    });
+    let payload = {};
+    try { payload = await response.json(); } catch (_) {}
+    if (!response.ok) throw new Error(payload.detail || "Could not save feedback.");
+    feedbackSaved = true;
+    status.textContent = payload.personalization && payload.personalization.message ? payload.personalization.message : "Preference saved locally. Thank you."; 
+    const learning = payload.personalization || {};
+    const badge = document.getElementById("learning-status");
+    badge.textContent = learning.active ? "Personalized · " + learning.feedback_count + " reviews" : "Learning: " + (learning.feedback_count || 0) + "/" + (learning.minimum_feedback || 3);
+    badge.title = learning.message || "";
+    document.getElementById("feedback-choice-panel").hidden = true;
+  } catch (error) {
+    status.textContent = error.message || "Feedback could not be saved. You can try again.";
+    buttons.forEach(function (button) { button.disabled = false; });
+  }
+}
+document.getElementById("feedback-yes").addEventListener("click", function () {
+  submitPreference(currentWinnerIndex);
+});
+document.getElementById("feedback-no").addEventListener("click", function () {
+  document.getElementById("feedback-choice-panel").hidden = false;
+  document.getElementById("preferred-candidate").focus();
+});
+document.getElementById("feedback-submit").addEventListener("click", function () {
+  submitPreference(document.getElementById("preferred-candidate").value);
+});
+
 analyzeButton.addEventListener("click", async function () {
   clearError();
   const prompt = promptInput.value.trim();

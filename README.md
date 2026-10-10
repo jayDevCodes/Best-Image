@@ -38,6 +38,12 @@ BEST_IMAGE_DEVICE=cpu python -m app
 - JSON API, health endpoint, ranking tests; no model download needed for tests.
 - No remote inference API, analytics, or permanent image storage by default.
 
+## Local feedback learning
+
+After every comparison the UI asks whether the winner was correct. You can accept it or select the candidate you actually prefer. Feedback is stored in a local SQLite database, not in the repository. It stores only criterion scores and the selected candidate index, not prompts, image bytes, or filenames. After at least three informative reviewed comparisons in the same profile, a regularized pairwise learner adjusts weights for future tasks. It does not fine-tune the SigLIP foundation model.
+
+See [docs/FEEDBACK_LEARNING.md](docs/FEEDBACK_LEARNING.md) for the learning rule, data location, reset instructions, and limitations.
+
 ## API
 
 - GET /api/health — readiness and model status.
@@ -62,9 +68,9 @@ See docs/ARCHITECTURE.md for module boundaries and roadmap.
 ## Roadmap
 
 1. v0.1: local evaluator and transparent baseline.
-2. v0.2: browser extension and more robust prompt/requirement extraction.
-3. v0.3: optional OCR and a small vision-language judge.
-4. v0.4: labelled preferences, calibration, and benchmark reporting.
+2. v0.2: local feedback capture and profile-level pairwise personalization (current).
+3. v0.3: browser extension, optional OCR, and a small vision-language judge.
+4. v0.4: labelled evaluation set, calibration, and benchmark reporting.
 
 ## License
 

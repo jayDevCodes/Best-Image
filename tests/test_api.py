@@ -29,7 +29,8 @@ def png_bytes(color):
     Image.new("RGB", (64, 64), color=color).save(output, format="PNG")
     return output.getvalue()
 
-def test_analyze_api_with_mocked_model(monkeypatch):
+def test_analyze_api_with_mocked_model(monkeypatch, tmp_path):
+    monkeypatch.setenv("BEST_IMAGE_DB_PATH", str(tmp_path / "feedback.sqlite3"))
     def fake_score(prompt, requirements, images):
         return {
             "prompt_scores": [85.0, 68.0],
@@ -52,4 +53,20 @@ def test_analyze_api_with_mocked_model(monkeypatch):
     assert len(payload["ranking"]) == 2
     assert payload["ranking"][0]["filename"] == "candidate-a.png"
     assert payload["winner_index"] == 0
+    assert payload["task_id"]
+    assert payload["personalization"]["active"] is False
     assert "spatial relation" in " ".join(payload["warnings"])
+
+    feedback = client.post("/api/feedback", json={
+        "task_id": payload["task_id"],
+        "preferred_index": 1,
+    })
+    assert feedback.status_code == 200, feedback.text
+    assert feedback.json()["feedback_count"] == 1
+    assert feedback.json()["personalization"]["active"] is False
+
+    invalid = client.post("/api/feedback", json={
+        "task_id": payload["task_id"],
+        "preferred_index": 99,
+    })
+    assert invalid.status_code == 422

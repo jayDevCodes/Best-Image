@@ -42,8 +42,22 @@
     </section>
 
     <section id="results-section" class="results-section" hidden>
-      <div class="results-header"><div><p class="eyebrow">ANALYSIS COMPLETE</p><h2>Ranking report</h2></div><span id="result-device" class="device-chip">LOCAL MODEL</span></div>
+      <div class="results-header"><div><p class="eyebrow">ANALYSIS COMPLETE</p><h2>Ranking report</h2></div><div class="result-badges"><span id="learning-status" class="learning-chip">Learning: 0/3</span><span id="result-device" class="device-chip">LOCAL MODEL</span></div></div>
       <div id="winner-card" class="winner-card"></div>
+      <section id="feedback-panel" class="feedback-panel" hidden aria-labelledby="feedback-title">
+        <p class="eyebrow">TEACH YOUR LOCAL RANKER</p>
+        <h3 id="feedback-title">Would you choose this image?</h3>
+        <p class="feedback-copy">Your choice is saved locally. After a few reviewed comparisons, Best-Image can adapt scoring weights for future tasks.</p>
+        <div class="feedback-actions">
+          <button id="feedback-yes" class="feedback-button positive" type="button">Yes, right pick</button>
+          <button id="feedback-no" class="feedback-button" type="button">I'd choose another</button>
+        </div>
+        <div id="feedback-choice-panel" class="feedback-choice" hidden>
+          <label class="label" for="preferred-candidate">Which image would you choose?</label>
+          <div class="feedback-select-row"><select id="preferred-candidate"></select><button id="feedback-submit" class="feedback-button positive" type="button">Save choice</button></div>
+        </div>
+        <p id="feedback-status" class="feedback-status" role="status" aria-live="polite"></p>
+      </section>
       <div id="warnings" class="warnings"></div>
       <div class="ranking-heading"><h3>All candidates</h3><span>Sorted by selected profile</span></div>
       <div id="ranking-list" class="ranking-list"></div>
