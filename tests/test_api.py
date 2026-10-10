@@ -14,6 +14,7 @@ def test_health_does_not_load_model_weights():
     assert payload["model"]["loaded"] is False
     assert "ocr" in payload["capabilities"]
     assert "object_detection" in payload["capabilities"]
+    assert "preference_reward" in payload["capabilities"]
 
 def test_profiles_are_exposed():
     response = client.get("/api/profiles")
@@ -137,6 +138,14 @@ def test_optional_visual_signals_are_added_only_when_available(monkeypatch, tmp_
     monkeypatch.setattr(main_module, "score_object_requirements", fake_objects)
     monkeypatch.setattr(main_module, "ocr_status", lambda: {"available": True, "message": "ready"})
     monkeypatch.setattr(main_module, "detector_status", lambda: {"available": True, "message": "ready"})
+    monkeypatch.setattr(main_module, "preference_reward_status", lambda: {
+        "enabled": True, "package_installed": True, "available": True,
+        "loaded": False, "model": "ImageReward-v1.0", "device": None, "message": "ready"
+    })
+    monkeypatch.setattr(main_module, "score_preference_reward", lambda prompt, images: {
+        "available": True, "used": True, "scores": [88.0, 20.0],
+        "message": "test preference reward", "warning": "test preference warning"
+    })
 
     response = client.post(
         "/api/analyze",
@@ -152,6 +161,8 @@ def test_optional_visual_signals_are_added_only_when_available(monkeypatch, tmp_
     assert by_index[0]["criteria"]["text_match"]["score"] == 95.0
     assert by_index[0]["criteria"]["object_match"]["score"] == 100.0
     assert by_index[0]["criteria"]["spatial_match"]["score"] == 100.0
+    assert by_index[0]["criteria"]["preference_match"]["score"] == 88.0
+    assert payload["capabilities"]["preference_reward"]["used"] is True
     assert payload["capabilities"]["ocr"]["used"] is True
     assert payload["capabilities"]["object_detection"]["used"] is True
     assert any("Optional local OCR" in item for item in payload["warnings"])
