@@ -26,7 +26,7 @@ def review_warnings(prompt: str) -> list[str]:
         warnings.append("The prompt may require exact counting. v0.1 uses image-text similarity, not a dedicated object counter.")
     if re.search(r"\b(text|spell|spelling|lettering|logo|sign|caption|written|words?)\b", prompt, re.IGNORECASE):
         warnings.append("The prompt mentions text or lettering. Exact OCR and spelling verification are not included in v0.1.")
-    if re.search(r"\b(left|right|behind|in front of|next to|above|below|foreground|background|between)\b", prompt, re.IGNORECASE):
+    if re.search(r"\b(left|right|behind|in front of|next to|above|below|beside|near|foreground|background|between)\b", prompt, re.IGNORECASE):
         warnings.append("The prompt contains a spatial relation. Similarity scoring may miss subtle placement errors.")
     if not warnings:
         warnings.append("Scores are similarity and image-statistic signals, not proof that every visual detail is correct.")
