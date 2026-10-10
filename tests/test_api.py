@@ -70,8 +70,33 @@ def test_analyze_api_with_mocked_model(monkeypatch, tmp_path):
     assert "object_counting" in feedback.json()["reason_tags"]
     assert feedback.json()["personalization"]["active"] is False
 
+    insights = client.get("/api/feedback/insights")
+    assert insights.status_code == 200, insights.text
+    themes = {item["id"]: item for item in insights.json()["themes"]}
+    assert themes["prompt_match"]["count"] >= 1
+    assert themes["text_or_spelling"]["has_current_signal"] is False
+
     invalid = client.post("/api/feedback", json={
         "task_id": payload["task_id"],
         "preferred_index": 99,
     })
     assert invalid.status_code == 422
+
+
+def test_cross_site_write_requests_are_blocked():
+    response = client.post(
+        "/api/feedback",
+        json={"task_id": "nonexistent", "preferred_index": 0},
+        headers={"Origin": "https://malicious.example"},
+    )
+    assert response.status_code == 403
+    assert "Cross-site" in response.json()["detail"]
+
+
+def test_extension_origin_is_allowed_through_origin_guard():
+    response = client.post(
+        "/api/feedback",
+        json={"task_id": "nonexistent", "preferred_index": 0},
+        headers={"Origin": "chrome-extension://abcdefghijklmnop"},
+    )
+    assert response.status_code == 404

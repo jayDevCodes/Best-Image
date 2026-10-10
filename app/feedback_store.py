@@ -17,7 +17,7 @@ import sys
 import uuid
 from typing import Any
 
-from app.feedback_insights import tag_feedback_reason
+from app.feedback_insights import CATEGORY_LABELS, tag_feedback_reason
 
 FEATURES = ("prompt_match", "requirement_match", "image_clarity", "technical_quality")
 MIN_FEEDBACK_COMPARISONS = 3
@@ -140,6 +140,50 @@ def record_feedback(task_id: str, preferred_index: int, reason: str = "") -> dic
             "reason_saved": bool(cleaned_reason),
             "reason_tags": reason_tags,
         }
+
+
+
+def get_feedback_insights() -> dict[str, Any]:
+    """Aggregate opt-in feedback topic tags without returning prompts, filenames, or images."""
+    with _database() as connection:
+        rows = connection.execute(
+            """SELECT feedback_tags FROM comparisons
+               WHERE preferred_index IS NOT NULL AND feedback_tags != '[]'"""
+        ).fetchall()
+        total_reviews = int(connection.execute(
+            "SELECT COUNT(*) AS n FROM comparisons WHERE preferred_index IS NOT NULL"
+        ).fetchone()["n"])
+        reasons_count = int(connection.execute(
+            """SELECT COUNT(*) AS n FROM comparisons
+               WHERE preferred_index IS NOT NULL AND feedback_reason != ''"""
+        ).fetchone()["n"])
+    counts: dict[str, int] = {}
+    for row in rows:
+        try:
+            tags = json.loads(row["feedback_tags"] or "[]")
+        except (TypeError, json.JSONDecodeError):
+            tags = []
+        for tag in set(tags):
+            counts[str(tag)] = counts.get(str(tag), 0) + 1
+    supported = {"prompt_match", "visual_clarity", "resolution_quality"}
+    themes = [
+        {
+            "id": tag,
+            "label": CATEGORY_LABELS.get(tag, tag.replace("_", " ").title()),
+            "count": count,
+            "has_current_signal": tag in supported,
+        }
+        for tag, count in sorted(counts.items(), key=lambda item: (-item[1], item[0]))
+    ]
+    return {
+        "total_reviews": total_reviews,
+        "reviews_with_reason": reasons_count,
+        "themes": themes,
+        "message": (
+            "Tags summarize written rationales; only the selected candidate and current criterion scores train the weight learner. "
+            "Tags marked without a current signal identify capabilities the scorer cannot reliably evaluate yet."
+        ),
+    }
 
 
 def _project_simplex(values: list[float]) -> list[float]:

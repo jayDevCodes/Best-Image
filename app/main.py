@@ -4,14 +4,16 @@ import os
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
+from fastapi.responses import JSONResponse
+from urllib.parse import urlsplit
 from pydantic import BaseModel, Field
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.config import load_profiles
-from app.feedback_store import create_comparison, get_profile_learning, record_feedback
+from app.feedback_store import create_comparison, get_feedback_insights, get_profile_learning, record_feedback
 from app.image_processing import MAX_IMAGE_BYTES, MAX_TOTAL_UPLOAD_BYTES, ImageValidationError, PreparedImage, decode_image
 from app.model import ModelUnavailableError, scorer
 from app.ranker import rank_candidates
@@ -35,6 +37,28 @@ app = FastAPI(
     docs_url="/api/docs", redoc_url=None,
 )
 app.mount("/static", StaticFiles(directory=WEB_DIR), name="static")
+
+
+@app.middleware("http")
+async def protect_local_write_endpoints(request: Request, call_next):
+    """Block cross-site browser POSTs into the loopback inference service."""
+    if request.method in {"POST", "PUT", "PATCH", "DELETE"} and request.url.path.startswith("/api/"):
+        origin = request.headers.get("origin")
+        if origin:
+            parsed = urlsplit(origin)
+            extension_origin = parsed.scheme == "chrome-extension" and bool(parsed.netloc) and not parsed.path
+            loopback_origin = (
+                parsed.scheme in {"http", "https"}
+                and parsed.hostname in {"127.0.0.1", "localhost", "::1"}
+                and parsed.port in {None, 8765}
+            )
+            if not (extension_origin or loopback_origin):
+                return JSONResponse(
+                    status_code=403,
+                    content={"detail": "Cross-site requests are blocked by the local Best-Image service."},
+                )
+    return await call_next(request)
+
 
 @app.get("/", include_in_schema=False)
 async def index() -> FileResponse:
@@ -65,6 +89,12 @@ async def submit_feedback(payload: FeedbackRequest) -> dict[str, Any]:
         "reason_tags": recorded["reason_tags"],
         "personalization": learning,
     }
+
+
+@app.get("/api/feedback/insights")
+async def feedback_insights() -> dict[str, Any]:
+    """Return aggregated local feedback themes, without exposing individual reasons."""
+    return get_feedback_insights()
 
 
 @app.get("/api/profiles")

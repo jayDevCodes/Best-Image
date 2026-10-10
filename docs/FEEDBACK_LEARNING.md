@@ -8,7 +8,7 @@ After an image comparison, the UI asks whether the recommended image matches the
 
 Best-Image stores criterion score vectors for the candidates and the chosen candidate index. It does not store the prompt text, source filenames, or image bytes. A regularized Bradley-Terry-style pairwise learner fits a non-negative weight vector on a simplex for each scoring profile. For one feedback record, the chosen image is treated as preferred over each alternative in that same comparison.
 
-The learned vector is anchored to the profile's existing weights. Personalization is enabled only after at least three reviewed comparisons and at least three informative pairwise differences. The new vector is then used for future tasks on the same profile. User feedback can be replaced if corrected through the API, and it does not update the foundation model weights.
+The learned vector is anchored to the profile's existing weights. Personalization is enabled only after at least three reviewed comparisons and at least three informative pairwise differences. The new vector is then used for future tasks on the same profile. User feedback can be replaced if corrected through the API, and it does not update the foundation model weights. Free-text rationale tags are diagnostic only; they do not currently influence the ranker, and tags for OCR/counting/spatial checks explicitly point to capabilities not yet implemented.
 
 ## Why this approach first
 
@@ -19,6 +19,7 @@ It is local, small, reversible, and testable without training a neural network. 
 - `POST /api/analyze` returns a local `task_id`, the active profile weights, and personalization status.
 - `POST /api/feedback` accepts JSON: `{"task_id":"...","preferred_index":1,"reason":"Optional explanation"}`. The reason is optional and capped at 2,000 characters.
 - `GET /api/health` shows the local model status.
+- `GET /api/feedback/insights` aggregates categorized rationale tags without returning individual explanations.
 
 ## Data location and privacy
 
@@ -27,7 +28,7 @@ The database is stored outside the repository:
 - Other platforms: `$XDG_DATA_HOME/Best-Image/feedback.sqlite3` or `~/.local/share/Best-Image/feedback.sqlite3`
 - Set `BEST_IMAGE_DB_PATH` to override this path (useful for tests or a separate local profile).
 
-The local database stores score features, a random task ID, model identifier, profile, preferred candidate index, and an optional user-entered feedback reason (up to 2,000 characters). No prompt, filenames or full images are saved by the feedback store. The browser extension may separately retain small thumbnail previews locally until deferred feedback is submitted or discarded. The local SQLite database can be deleted to reset personalization.
+The local database stores score features, a random task ID, model identifier, profile, preferred candidate index, an optional user-entered feedback reason (up to 2,000 characters), and derived topic tags. No prompt, filenames or full images are saved by the feedback store. The browser extension may separately retain small thumbnail previews locally until deferred feedback is submitted or discarded. The local SQLite database can be deleted to reset personalization.
 
 ## Limitations
 

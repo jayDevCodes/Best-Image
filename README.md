@@ -50,6 +50,7 @@ See [docs/FEEDBACK_LEARNING.md](docs/FEEDBACK_LEARNING.md) for the learning rule
 - GET /api/profiles — available scoring profiles.
 - POST /api/analyze — multipart form with prompt, profile, and 2–6 files under images.
 - POST /api/feedback — JSON with task_id, preferred_index, and optional reason (max 2,000 characters).
+- GET /api/feedback/insights — aggregated local feedback topic counts, without exposing individual rationales.
 - GET / — local interface.
 
 ## Scoring
@@ -61,6 +62,7 @@ Default initial weights: prompt match 55%, inferred requirement match 30%, image
 - Python 3.11 is recommended; PyTorch MPS is selected automatically when available.
 - The model loads lazily and uses small batches. Peak memory and latency vary; close memory-heavy apps on an 8 GB Mac.
 - The server binds to 127.0.0.1 by default. Image bytes are processed in memory and are not saved by the application.
+- Browser-originated write requests to the API are restricted to loopback and Chrome-extension origins to reduce cross-site abuse of the local service.
 - The initial model download needs internet; cached inference works locally.
 - Do not expose this development server to an untrusted network.
 
