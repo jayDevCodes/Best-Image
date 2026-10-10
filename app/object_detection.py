@@ -81,6 +81,10 @@ def detector_status() -> dict[str, Any]:
 
 def _read_expected_count(prompt: str, position: int) -> int | None:
     prefix = prompt[max(0, position - 55):position]
+    # Avoid treating an image/candidate/page index as an object count:
+    # "Image 2 shows a person" means one person-mentioned image, not two people.
+    if re.search(r"\b(image|picture|photo|candidate|option|version|page|step|frame|figure)\s*$", prefix, re.I):
+        return None
     matches = list(_NUMBER.finditer(prefix))
     if not matches:
         return None
