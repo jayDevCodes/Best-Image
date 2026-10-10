@@ -11,6 +11,7 @@ CRITERIA = {
     "text_match": "Quoted-text OCR match (optional)",
     "object_match": "Object presence/count (optional detector)",
     "spatial_match": "2-D left/right/above/below (optional detector)",
+    "preference_match": "Human-preference reward (optional ImageReward)",
 }
 
 def rank_candidates(candidates: list[dict[str, Any]], weights: dict[str, float], requirement_labels: list[str]) -> list[dict[str, Any]]:
@@ -28,7 +29,7 @@ def rank_candidates(candidates: list[dict[str, Any]], weights: dict[str, float],
         }
         if details:
             scores["requirement_match"] = sum(details) / len(details)
-        for optional_signal in ("text_match", "object_match", "spatial_match"):
+        for optional_signal in ("text_match", "object_match", "spatial_match", "preference_match"):
             if candidate.get(optional_signal) is not None:
                 scores[optional_signal] = max(0.0, min(100.0, float(candidate[optional_signal])))
         active_weights = normalized_weights(weights, set(scores))
@@ -54,6 +55,8 @@ def rank_candidates(candidates: list[dict[str, Any]], weights: dict[str, float],
             reasons.append("Optional detector found a weak supported-object/count match; inspect counts manually")
         if scores.get("spatial_match", 100.0) < 50:
             reasons.append("Optional detector found a weak 2-D relation match; inspect placement manually")
+        if scores.get("preference_match", 100.0) < 50:
+            reasons.append("Optional ImageReward human-preference signal was low; inspect the image manually")
         if not reasons:
             reasons.append("Review the score breakdown; no single heuristic dominates")
         ranked.append({
