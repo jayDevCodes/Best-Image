@@ -61,7 +61,8 @@ def rank_candidates(candidates: list[dict[str, Any]], weights: dict[str, float],
     for position, candidate in enumerate(ranked, start=1):
         candidate["rank"] = position
     gap = ranked[0]["score"] - ranked[1]["score"]
-    ranked[0]["decision_confidence"] = "low" if gap < 3 else "medium" if gap < 8 else "high"
+    # This is only the numerical separation between the top two candidates.
+    ranked[0]["margin_band"] = "low" if gap < 3 else "medium" if gap < 8 else "high"
     ranked[0]["winner_summary"] = (
         f"Ranks first by the selected scoring profile with a {gap:.1f}-point gap to the next candidate. "
         "Treat this as a comparative recommendation, not a correctness probability."

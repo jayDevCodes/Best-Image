@@ -15,7 +15,7 @@ def test_ranker_returns_deterministic_order_and_breakdown():
     assert [item["index"] for item in first] == [item["index"] for item in second]
     assert first[0]["rank"] == 1 and first[1]["rank"] == 2
     assert set(first[0]["criteria"]) == set(weights)
-    assert first[0]["decision_confidence"] in {"low", "medium", "high"}
+    assert first[0]["margin_band"] in {"low", "medium", "high"}
 
 def test_missing_requirement_score_reweights_available_criteria():
     candidates = sample_candidates()

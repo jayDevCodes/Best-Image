@@ -3,6 +3,7 @@ const MIN_FILES = 2;
 const MAX_BYTES = 15 * 1024 * 1024;
 let selectedFiles = [];
 let previewUrls = [];
+let resultUrls = [];
 
 const promptInput = document.getElementById("prompt");
 const imageInput = document.getElementById("image-input");
@@ -19,14 +20,15 @@ function escapeHtml(value) {
     return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[char];
   });
 }
-function showError(message) {
-  formError.textContent = message;
-  formError.hidden = false;
-}
+function showError(message) { formError.textContent = message; formError.hidden = false; }
 function clearError() { formError.textContent = ""; formError.hidden = true; }
-function releasePreviews() {
+function releasePreviewUrls() {
   previewUrls.forEach(function (url) { URL.revokeObjectURL(url); });
   previewUrls = [];
+}
+function releaseResultUrls() {
+  resultUrls.forEach(function (url) { URL.revokeObjectURL(url); });
+  resultUrls = [];
 }
 function setFiles(incoming) {
   clearError();
@@ -47,7 +49,7 @@ function setFiles(incoming) {
 }
 function removeFile(index) { selectedFiles.splice(index, 1); renderPreviews(); }
 function renderPreviews() {
-  releasePreviews();
+  releasePreviewUrls();
   previewGrid.replaceChildren();
   selectedFiles.forEach(function (file, index) {
     const url = URL.createObjectURL(file);
@@ -102,6 +104,7 @@ function metricRow(label, score) {
     safeScore.toFixed(0) + '</span></div>';
 }
 function renderResults(payload) {
+  releaseResultUrls();
   const files = selectedFiles.slice();
   const ranking = payload.ranking;
   const winner = ranking[0];
@@ -109,7 +112,7 @@ function renderResults(payload) {
     const file = files[index];
     if (!file) return "";
     const url = URL.createObjectURL(file);
-    previewUrls.push(url);
+    resultUrls.push(url);
     return url;
   }
   const winnerUrl = makeUrl(winner.index);
@@ -118,8 +121,8 @@ function renderResults(payload) {
     '<div class="winner-preview"><img src="' + winnerUrl + '" alt="Top-ranked candidate ' + escapeHtml(winner.filename) + '"></div>' +
     '<div class="winner-content"><span class="winner-label">TOP RECOMMENDATION</span><h3 class="winner-title">' +
     escapeHtml(winner.filename) + '</h3><p class="winner-description">' + escapeHtml(winner.winner_summary || "Ranks first under this scoring profile.") +
-    '</p><div class="winner-score"><strong>' + Number(winner.score).toFixed(1) + '</strong><span>/ 100 ranking index · ' +
-    escapeHtml(winner.decision_confidence || "low") + ' confidence</span></div><ul class="winner-reasons">' +
+    '</p><div class="winner-score"><strong>' + Number(winner.score).toFixed(1) + '</strong><span>/ 100 ranking index · score separation: ' +
+    escapeHtml(winner.margin_band || "low") + '</span></div><ul class="winner-reasons">' +
     winner.reasons.map(function (reason) { return '<li>' + escapeHtml(reason) + '</li>'; }).join("") + '</ul></div>';
 
   const warningBox = document.getElementById("warnings");
@@ -189,7 +192,7 @@ async function init() {
       select.append(option);
     });
   } catch (_) {
-    // Keep the built-in choices if profile discovery is temporarily unavailable.
+    // Keep built-in profile choices if profile discovery is temporarily unavailable.
   }
 }
 init();
