@@ -12,7 +12,7 @@ The learned vector is anchored to the profile's existing weights. Personalizatio
 
 ## Why this approach first
 
-It is local, small, reversible, and testable without training a neural network. It optimizes relative preferences for the available scoring signals; it does not magically teach the model visual concepts the base scorer cannot detect. For example, if a user prefers accurate lettering but OCR is not installed or the prompt does not provide quoted expected text, feedback cannot reliably create that capability. Optional local OCR is now available; a COCO detector can also estimate supported object counts and simple 2-D relations when explicitly enabled. Neither expands the base model's class set or guarantees correctness.
+It is local, small, reversible, and testable without training a neural network. It optimizes relative preferences for the available scoring signals; it does not magically teach the model visual concepts the base scorer cannot detect. For example, if a user prefers accurate lettering but OCR is not installed or the prompt does not provide quoted expected text, feedback cannot reliably create that capability. Optional local OCR is available; a COCO detector can estimate supported object counts and simple 2-D relations when enabled. An opt-in SmolVLM2 reviewer can add another heuristic signal for close or detail-heavy comparisons, but it may hallucinate and is not proof of correctness. These optional signals do not expand the base SigLIP model's trained class set or guarantee correctness.
 
 ## API
 
