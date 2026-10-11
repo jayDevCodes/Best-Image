@@ -16,7 +16,7 @@ def test_health_does_not_load_model_weights():
     assert "object_detection" in payload["capabilities"]
     assert "preference_reward" in payload["capabilities"]
     assert "vlm_review" in payload["capabilities"]
-    assert payload["capabilities"]["vlm_review"]["used"] is False
+    assert payload["capabilities"]["vlm_review"]["loaded"] is False
 
 def test_profiles_are_exposed():
     response = client.get("/api/profiles")

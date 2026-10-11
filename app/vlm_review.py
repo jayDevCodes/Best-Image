@@ -20,7 +20,7 @@ _TORCH: Any = None
 _DEVICE: str | None = None
 _LOAD_ERROR: str | None = None
 _LOCK = threading.RLock()
-_SCORE_PATTERN = re.compile(r"\bSCORE\s*:\s*(\d{1,3})\b", re.IGNORECASE)
+_SCORE_PATTERN = re.compile(r"\bSCORE\s*:\s*(?<![-+])(\d{1,3})(?!\d)\b", re.IGNORECASE)
 _REASON_PATTERN = re.compile(r"^\s*REASON\s*:\s*(.+?)\s*$", re.IGNORECASE | re.MULTILINE)
 
 
