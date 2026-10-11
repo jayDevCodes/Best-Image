@@ -13,7 +13,8 @@ DEFAULT_WEIGHTS = {
     "text_match": 0.06,
     "preference_match": 0.10,
     "image_clarity": 0.025,
-    "technical_quality": 0.015,
+    "technical_quality": 0.0132,
+    "vlm_match": 0.12,
 }
 
 def load_profiles() -> dict[str, dict[str, Any]]:

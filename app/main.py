@@ -1,6 +1,7 @@
 """FastAPI application for the local Best-Image evaluator."""
 from __future__ import annotations
 import os
+import re
 import threading
 from pathlib import Path
 from typing import Any
@@ -20,6 +21,7 @@ from app.model import ModelUnavailableError, scorer
 from app.ocr import analyze_text_prompt, ocr_status
 from app.object_detection import detector_status, score_object_requirements, unload_object_detector
 from app.preference_reward import preference_reward_status, score_preference_reward, unload_preference_reward
+from app.vlm_review import score_vlm_review, unload_vlm_review, vlm_review_status
 from app.ranker import rank_candidates
 from app.requirements_parser import extract_requirements, review_warnings
 
@@ -29,11 +31,46 @@ MAX_IMAGES = 6
 MIN_IMAGES = 2
 MAX_PROMPT_CHARS = 2000
 _ANALYSIS_LOCK = threading.RLock()
+_VLM_DETAIL_PATTERN = re.compile(
+    r"\b(?:exactly|at least|at most|no more than|without|excluding|"
+    r"one|two|three|four|five|six|seven|eight|nine|ten|\d+|"
+    r"text|spelling|lettering|written|reading|reads|left|right|above|below|"
+    r"behind|in front of|next to|beside|between|logo|caption|sign)\b",
+    re.IGNORECASE,
+)
+
+
+def _should_run_vlm_review(prompt: str, ranking: list[dict[str, Any]]) -> bool:
+    """Use the optional VLM only for a close baseline or prompts with fragile details."""
+    if len(ranking) < 2:
+        return False
+    try:
+        gap = float(ranking[0]["score"]) - float(ranking[1]["score"])
+    except (KeyError, TypeError, ValueError):
+        gap = 0.0
+    return gap < 5.0 or bool(_VLM_DETAIL_PATTERN.search(prompt or ""))
+
+
+def _run_vlm_review_task(prompt: str, images: list[Any]) -> dict[str, Any]:
+    """Run the optional VLM after releasing other resident backbones."""
+    with _ANALYSIS_LOCK:
+        if scorer.status().get("loaded"):
+            scorer.unload()
+        if detector_status().get("loaded"):
+            unload_object_detector()
+        if preference_reward_status().get("loaded"):
+            unload_preference_reward()
+        try:
+            return score_vlm_review(prompt, images)
+        finally:
+            unload_vlm_review()
 
 
 def _run_visual_pipeline(prompt: str, requirement_labels: list[str], images: list[Any]) -> dict[str, Any]:
     """Run large local vision models serially to limit peak memory on small Macs."""
     with _ANALYSIS_LOCK:
+        if vlm_review_status().get("loaded"):
+            unload_vlm_review()
         if preference_reward_status().get("loaded"):
             unload_preference_reward()
         if detector_status().get("loaded"):
@@ -115,6 +152,7 @@ async def health() -> dict[str, Any]:
             "ocr": ocr_status(),
             "object_detection": detector_status(),
             "preference_reward": preference_reward_status(),
+            "vlm_review": vlm_review_status(),
         },
     }
 
@@ -240,6 +278,40 @@ async def analyze(
             warning_list.append(warning)
 
     ranking = rank_candidates(candidates, learning["weights"], requirement_labels)
+    vlm_status = vlm_review_status()
+    vlm_analysis: dict[str, Any] = {
+        "available": False, "used": False, "scores": None, "reasons": [],
+        "message": "VLM review was not needed for this comparison.", "warning": None,
+    }
+    if vlm_status.get("available") and _should_run_vlm_review(cleaned_prompt, ranking):
+        vlm_analysis = await run_in_threadpool(_run_vlm_review_task, cleaned_prompt, image_list)
+        scores = vlm_analysis.get("scores")
+        valid_scores = (
+            isinstance(scores, list)
+            and len(scores) == len(candidates)
+            and all(
+                isinstance(score, (int, float))
+                and not isinstance(score, bool)
+                and 0.0 <= float(score) <= 100.0
+                for score in scores
+            )
+        )
+        if vlm_analysis.get("used") and valid_scores:
+            reasons = vlm_analysis.get("reasons") if isinstance(vlm_analysis.get("reasons"), list) else []
+            for index, candidate in enumerate(candidates):
+                candidate["vlm_match"] = float(scores[index])
+                if index < len(reasons) and isinstance(reasons[index], str) and reasons[index].strip():
+                    candidate["vlm_reason"] = reasons[index].strip()[:180]
+            ranking = rank_candidates(candidates, learning["weights"], requirement_labels)
+        elif vlm_analysis.get("used"):
+            vlm_analysis["used"] = False
+            vlm_analysis["warning"] = "The optional VLM returned invalid scores; baseline ranking was kept."
+        if vlm_analysis.get("warning"):
+            warning_list.append(vlm_analysis["warning"])
+    elif vlm_status.get("enabled") and not vlm_status.get("available"):
+        warning_list.append(vlm_status.get("message") or "VLM review is enabled, but its dependencies are unavailable.")
+    elif vlm_status.get("available") and not _should_run_vlm_review(cleaned_prompt, ranking):
+        vlm_analysis["message"] = "Skipped to save time and memory: the baseline gap was clear and no fragile detail was detected."
     task_id = create_comparison(profile, model_result["model"], ranking)
     top_gap = ranking[0]["score"] - ranking[1]["score"]
     return {
@@ -274,6 +346,13 @@ async def analyze(
                 "used": bool(reward_analysis.get("used")),
                 "message": reward_analysis.get("message"),
                 "warning": reward_analysis.get("warning"),
+            },
+            "vlm_review": {
+                **vlm_status,
+                "used": bool(vlm_analysis.get("used")),
+                "analysis_available": bool(vlm_analysis.get("available") and vlm_analysis.get("used")),
+                "message": vlm_analysis.get("message") or vlm_status.get("message"),
+                "warning": vlm_analysis.get("warning"),
             },
         },
         "warnings": warning_list,

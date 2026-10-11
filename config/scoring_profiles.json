@@ -4,28 +4,30 @@
       "label": "Prompt Accuracy",
       "description": "Prioritize prompt details; optional OCR, object detection, 2-D relation and human-preference signals are used only when enabled and available.",
       "weights": {
-        "prompt_match": 0.46,
-        "requirement_match": 0.22,
-        "object_match": 0.08,
-        "spatial_match": 0.04,
-        "text_match": 0.06,
-        "preference_match": 0.1,
-        "image_clarity": 0.025,
-        "technical_quality": 0.015
+        "prompt_match": 0.4048,
+        "requirement_match": 0.1936,
+        "object_match": 0.0704,
+        "spatial_match": 0.0352,
+        "text_match": 0.0528,
+        "preference_match": 0.088,
+        "image_clarity": 0.022,
+        "technical_quality": 0.0132,
+        "vlm_match": 0.12
       }
     },
     "visual_balance": {
       "label": "Visual Balance",
       "description": "Balance semantic relevance, visual quality and available optional local preference/text/object signals.",
       "weights": {
-        "prompt_match": 0.32,
-        "requirement_match": 0.16,
-        "object_match": 0.08,
-        "spatial_match": 0.04,
-        "text_match": 0.08,
-        "preference_match": 0.1,
-        "image_clarity": 0.14,
-        "technical_quality": 0.08
+        "prompt_match": 0.2816,
+        "requirement_match": 0.1408,
+        "object_match": 0.0704,
+        "spatial_match": 0.0352,
+        "text_match": 0.0704,
+        "preference_match": 0.088,
+        "image_clarity": 0.1232,
+        "technical_quality": 0.0704,
+        "vlm_match": 0.12
       }
     }
   }

@@ -28,7 +28,7 @@ If MPS inference has issues, use CPU mode:
 BEST_IMAGE_DEVICE=cpu python -m app
 ```
 
-## v0.1 features
+## Features
 
 - Paste a prompt and upload 2–6 candidate images (PNG, JPEG, WebP).
 - Local model: google/siglip2-base-patch16-256 (Apache-2.0 per its model card).
@@ -50,6 +50,16 @@ BEST_IMAGE_DEVICE=cpu python -m app
 The `/api/health` endpoint reports optional capability availability without loading their model weights.
 
 **Optional human-preference reward (ImageReward):** This adds a separate preference-trained signal, but it loads a BLIP-Large backbone and can be expensive in memory and first-download time on an 8 GB Mac. Install the optional package with `pip install -r requirements-reward.txt`, then enable it for a run with `BEST_IMAGE_ENABLE_PREFERENCE_REWARD=1 python -m app`. It is disabled by default and loaded lazily. The app unloads the model after scoring to avoid keeping multiple large backbones in memory. Treat its score as a learned human-preference estimate, not proof that every requested detail is correct. If memory is tight, leave this option off (and also leave the optional detector disabled).
+
+## Optional small vision-language review
+
+**SmolVLM2 256M (off by default):** This is a second local reviewer for close rankings or prompts with fragile details such as exact counts, quoted text, or spatial placement. It runs only when enabled and relevant, and adds a separately labelled heuristic score; it is not proof of correctness. The model is loaded lazily and sees in-memory images and the current prompt only. The feedback database still stores criterion scores, not prompt text or image bytes.
+
+Enable it for a run (from the project root):
+
+    BEST_IMAGE_ENABLE_VLM_REVIEW=1 python -m app
+
+Transformers is already part of requirements.txt. The first eligible comparison downloads HuggingFaceTB/SmolVLM2-256M-Video-Instruct into the local Hugging Face cache; subsequent inference is local. Set BEST_IMAGE_VLM_DEVICE=cpu to force CPU execution, or use auto (the default) to prefer MPS when available. This can add latency and memory use, especially on an 8 GB Mac; the implementation unloads the other local vision backbones before review and releases the VLM afterward. The score and model-generated short note may be wrong, so verify visible text, counts, and relations yourself. If loading or inference fails, the baseline ranking is retained.
 
 ## Local feedback learning
 
@@ -92,12 +102,11 @@ Default weights are engineering defaults, not calibrated measures. Available sco
 
 See docs/ARCHITECTURE.md for module boundaries and roadmap.
 
-## Roadmap
+## Project status
 
-1. v0.1: local evaluator and transparent baseline.
-2. v0.2: local feedback capture and profile-level pairwise personalization (current).
-3. v0.3: browser extension integration with optional local OCR and object checks (implemented as opt-in signals).
-4. v0.4: labelled evaluation set, calibration, and benchmark reporting.
+Implemented: local SigLIP 2 ranking, transparent image diagnostics, profile-level feedback learning, optional quoted-text OCR, optional COCO object/count and simple 2-D relation checks, optional ImageReward, optional SmolVLM2 detail review, and an offline JSONL benchmark evaluator.
+
+Useful remaining work is evidence-driven rather than a promised feature checklist: build a representative human-labelled holdout set; measure top-1/top-3 and latency/memory on target hardware; evaluate how often optional models improve decisions; then calibrate scores only if the data supports it. CI is model-free and does not claim to benchmark real model inference on an Apple Silicon Mac.
 
 ## License
 

@@ -15,6 +15,8 @@ def test_health_does_not_load_model_weights():
     assert "ocr" in payload["capabilities"]
     assert "object_detection" in payload["capabilities"]
     assert "preference_reward" in payload["capabilities"]
+    assert "vlm_review" in payload["capabilities"]
+    assert payload["capabilities"]["vlm_review"]["used"] is False
 
 def test_profiles_are_exposed():
     response = client.get("/api/profiles")
@@ -166,3 +168,44 @@ def test_optional_visual_signals_are_added_only_when_available(monkeypatch, tmp_
     assert payload["capabilities"]["ocr"]["used"] is True
     assert payload["capabilities"]["object_detection"]["used"] is True
     assert any("Optional local OCR" in item for item in payload["warnings"])
+
+
+
+def test_vlm_review_can_augment_detail_heavy_comparison(monkeypatch, tmp_path):
+    monkeypatch.setenv("BEST_IMAGE_DB_PATH", str(tmp_path / "feedback.sqlite3"))
+
+    def fake_score(prompt, requirements, images):
+        return {
+            "prompt_scores": [80.0, 79.0],
+            "requirement_scores": [[], []],
+            "model": "fake-test-scorer",
+            "device": "cpu",
+        }
+
+    monkeypatch.setattr(main_module.scorer, "score", fake_score)
+    monkeypatch.setattr(main_module, "vlm_review_status", lambda: {
+        "enabled": True, "package_installed": True, "available": True, "loaded": False,
+        "model": "test-vlm", "device": None, "load_error": None, "message": "ready",
+    })
+    monkeypatch.setattr(main_module, "_run_vlm_review_task", lambda prompt, images: {
+        "available": True, "used": True, "scores": [40.0, 95.0],
+        "reasons": ["The bus is partly occluded.", "The requested count and placement look closer."],
+        "message": "test VLM", "warning": "Optional local VLM scores are heuristic.",
+    })
+
+    response = client.post(
+        "/api/analyze",
+        data={"prompt": 'A sign reading "OPEN" with exactly two bicycles to the left of a bus', "profile": "prompt_accuracy"},
+        files=[
+            ("images", ("candidate-a.png", png_bytes((180, 20, 30)), "image/png")),
+            ("images", ("candidate-b.png", png_bytes((20, 30, 180)), "image/png")),
+        ],
+    )
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    by_index = {item["index"]: item for item in payload["ranking"]}
+    assert by_index[0]["criteria"]["vlm_match"]["score"] == 40.0
+    assert by_index[1]["criteria"]["vlm_match"]["score"] == 95.0
+    assert any("Unverified local VLM note" in note for note in by_index[1]["reasons"])
+    assert payload["capabilities"]["vlm_review"]["used"] is True
+    assert any("Optional local VLM scores are heuristic" in warning for warning in payload["warnings"])

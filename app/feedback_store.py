@@ -19,7 +19,7 @@ from typing import Any
 
 from app.feedback_insights import CATEGORY_LABELS, tag_feedback_reason
 
-FEATURES = ("prompt_match", "requirement_match", "object_match", "spatial_match", "text_match", "preference_match", "image_clarity", "technical_quality")
+FEATURES = ("prompt_match", "requirement_match", "object_match", "spatial_match", "text_match", "preference_match", "image_clarity", "technical_quality", "vlm_match")
 MIN_FEEDBACK_COMPARISONS = 3
 
 
